@@ -5,6 +5,8 @@ from pybullet_multigoal_gym.utils.demonstrator import StepDemonstrator
 from pybullet_multigoal_gym.envs.base_envs.base_env import BaseBulletMGEnv
 from pybullet_multigoal_gym.robots.kuka import Kuka
 from pybullet_multigoal_gym.robots.chest import Chest
+from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward
+
 
 
 class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
@@ -334,15 +336,20 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
                     'desired_goal_img': self.desired_goal_image.copy(),
                 })
         return obs_dict
-
     def _compute_reward(self, achieved_goal, desired_goal):
-        assert achieved_goal.shape == desired_goal.shape
-        d = np.linalg.norm(achieved_goal - desired_goal, axis=-1)
-        not_achieved = (d > self.distance_threshold)
-        if self.binary_reward:
-            return -not_achieved.astype(np.float32), ~not_achieved
-        else:
-            return -d, ~not_achieved
+        # this computes the extrinsic reward
+        computer_reward = Compute_reward()
+        return computer_reward.basic_compute_reward(achieved_goal=achieved_goal,desired_goal=desired_goal,
+                                                   distance_threshold = self.distance_threshold,binary_reward = self.binary_reward)
+
+    # def _compute_reward(self, achieved_goal, desired_goal):
+    #     assert achieved_goal.shape == desired_goal.shape
+    #     d = np.linalg.norm(achieved_goal - desired_goal, axis=-1)
+    #     not_achieved = (d > self.distance_threshold)
+    #     if self.binary_reward:
+    #         return -not_achieved.astype(np.float32), ~not_achieved
+    #     else:
+    #         return -d, ~not_achieved
 
     def _generate_goal(self, block_poses, new_target=True):
         raise NotImplementedError

@@ -3,7 +3,7 @@ import numpy as np
 import quaternion as quat
 from pybullet_multigoal_gym.envs.base_envs.base_env import BaseBulletMGEnv
 from pybullet_multigoal_gym.robots.kuka import Kuka
-
+from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward
 
 class KukaBulletInsertionEnv(BaseBulletMGEnv):
     """
@@ -215,29 +215,16 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
         slot_target_xyz, (a, b, c, w), _, _, _, _ = self._p.getLinkState(self.object_bodies['slot'], 3)
         slot_target_euler = quat.as_euler_angles(quat.as_quat_array([w, a, b, c]))
         slot_target_xyz = np.array(slot_target_xyz)
-
-        # pick-up reward
-        # this reward specifies grasping point & goal object height
-        d_goal_obj_grip = np.linalg.norm(grasp_target_xyz - gripper_xyz, axis=-1) + np.abs(0.15 - goal_object_xyz[-1])
-        # this reward only specifies goal object height
-        # d_goal_obj_grip = np.abs(0.15 - goal_object_xyz[-1])
-        reward_pick_up = -d_goal_obj_grip
-        achieved_pick_up = (d_goal_obj_grip < self.distance_threshold)
-        # reach reward
         reach_target_xyz = slot_target_xyz.copy()
         reach_target_xyz[-1] += 0.06
-        d_goal_obj_reach_slot = np.linalg.norm(goal_object_xyz - reach_target_xyz, axis=-1) + \
-                                np.linalg.norm(goal_object_euler - slot_target_euler.copy(), axis=-1)
-        reward_reach = -d_goal_obj_reach_slot
-        achieved_reach = (d_goal_obj_reach_slot < self.distance_threshold)
-        # insert reward
         insert_target_xyz = slot_target_xyz.copy()
         insert_target_xyz[-1] += 0.03
-        d_goal_obj_insert_slot = np.linalg.norm(goal_object_xyz - insert_target_xyz, axis=-1) + \
-                                 np.linalg.norm(goal_object_euler - slot_target_euler.copy(), axis=-1)
-        reward_insert = -d_goal_obj_insert_slot
-        achieved_insert = (d_goal_obj_insert_slot < self.distance_threshold)
-
+        
+        compute_reward = Compute_reward(distance_threshold = self.distance_threshold)
+        reward_pick_up,achieved_pick_up = compute_reward.pick_up_reward(gripper_xyz,grasp_target_xyz,goal_object_xyz)
+        reward_reach,achieved_reach =  compute_reward.reach_reward(reach_target_xyz,goal_object_xyz,slot_target_euler,goal_object_euler)
+        reward_insert, achieved_insert =  compute_reward.insert_reward(insert_target_xyz,goal_object_xyz,slot_target_euler,goal_object_euler)
+        
         return {
             'pick_up': np.clip(reward_pick_up, -15.0, 0.0),
             'pick_up_done': achieved_pick_up,
@@ -255,13 +242,8 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
 
     def _compute_reward(self, achieved_goal, desired_goal):
         # this computes the extrinsic reward
-        assert achieved_goal.shape == desired_goal.shape
-        d = np.linalg.norm(achieved_goal - desired_goal, axis=-1)
-        not_achieved = (d > self.distance_threshold)
-        if self.binary_reward:
-            return -not_achieved.astype(np.float32), ~not_achieved
-        else:
-            return -d, ~not_achieved
+        computer_reward = Compute_reward(distance_threshold = self.distance_threshold)
+        return computer_reward.basic_compute_reward(achieved_goal=achieved_goal,desired_goal=desired_goal,binary_reward = self.binary_reward)
 
     def set_object_pose(self, body_id, position, orientation=None):
         if orientation is None:

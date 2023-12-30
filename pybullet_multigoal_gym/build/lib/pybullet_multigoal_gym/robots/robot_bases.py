@@ -25,6 +25,15 @@ class XmlBasedRobot(object):
                 part_name = joint_info[12].decode("utf8")
                 self.parts[part_name] = BodyPart(self._p, part_name, bodies, i, j)
                 self.jdict[joint_name] = Joint(self._p, bodies, i, j, joint_info)
+    
+    def reset():
+        raise NotImplementedError
+    def robot_specific_reset():
+        raise NotImplementedError
+    def calc_robot_state():
+        raise NotImplementedError
+    def apply_action():
+        raise NotImplementedError
 
 
 class URDFBasedRobot(XmlBasedRobot):
