@@ -216,7 +216,7 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
                 basePosition=self.object_initial_pos[self.grip_target_key][:3],
                 baseOrientation=self.object_initial_pos[self.grip_target_key][3:])
     
-    def randomize_object_positions(self):
+    def _randomize_object_positions(self):
         block_poses = []
         for _ in range(self.num_block):
             done = False
@@ -247,7 +247,7 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
                                     self.object_initial_pos[self.grip_target_key][3:])
 
         # randomize object positions
-        block_poses = self.randomize_object_positions()
+        block_poses = self._randomize_object_positions()
 
         if self.chest:
             self.chest_robot.robot_specific_reset()
