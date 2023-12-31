@@ -129,10 +129,10 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
         if not self.objects_urdf_loaded:
             # don't reload object urdf
             self._load_object()
-        if not self.visualize_target:
-            self.set_object_pose(self.object_bodies[self.goal_object_key+'_target'],
-                                [0.0, 0.0, -3.0],
-                                self.object_initial_pos['target'][3:])
+            if not self.visualize_target:
+                self.set_object_pose(self.object_bodies[self.goal_object_key+'_target'],
+                                    [0.0, 0.0, -3.0],
+                                    self.object_initial_pos['target'][3:])
         self.randomize_object_positions()
 
     # def _task_reset(self, test=False):
@@ -199,7 +199,7 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
     def _step_callback(self):
         pass
     
-    def _calculate_robot_state(self):
+    def _calculate_all_state(self):
         state = []
         object_state = []
         achieved_goal = []
@@ -226,9 +226,9 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
 
         auxiliary_task_state = np.concatenate(object_state)
         achieved_goal = np.concatenate(achieved_goal)
-        return gripper_xyz,state,policy_state,auxiliary_task_state,achieved_goal
+        return state,policy_state,auxiliary_task_state,achieved_goal
     
-    def _image_observation(self,obs_dict):
+    def _image_observation_handle(self,obs_dict):
         images = []
         state = obs_dict['observation']
         for cam_id in self.observation_cam_id:
@@ -257,7 +257,7 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
                 
         assert self.desired_goal is not None
         gripper_xyz, _, _, _, _, _, _,_ = self.robot.calc_robot_state()
-        state,policy_state,auxiliary_task_state,achieved_goal = self._calculate_robot_state()
+        state,policy_state,auxiliary_task_state,achieved_goal = self._calculate_all_state()
         
         assert achieved_goal.shape == self.desired_goal.shape
 
@@ -271,7 +271,7 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
         }
 
         if self.image_observation:
-            updated_obs_dict = self._image_observation(obs_dict=obs_dict)
+            updated_obs_dict = self._image_observation_handle(obs_dict=obs_dict)
 
         return updated_obs_dict
 

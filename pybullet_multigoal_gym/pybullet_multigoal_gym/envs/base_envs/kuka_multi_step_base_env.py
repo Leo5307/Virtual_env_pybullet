@@ -182,53 +182,47 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
                     self._update_gripper_target(self.desired_goal[-3:])
         return self.desired_goal
     
-    def _task_reset(self, test=False):
-        self.test = test
-        if not self.objects_urdf_loaded:
-            # don't reload object urdf
-            self.objects_urdf_loaded = True
-            self.object_bodies['table'] = self._p.loadURDF(
-                os.path.join(self.object_assets_path, "table.urdf"),
-                basePosition=self.object_initial_pos['table'][:3],
-                baseOrientation=self.object_initial_pos['table'][3:])
-            if self.chest:
-                self.chest_robot.reset()
+    def _load_object(self):
+        # don't reload object urdf
+        self.objects_urdf_loaded = True
+        self.object_bodies['table'] = self._p.loadURDF(
+            os.path.join(self.object_assets_path, "table.urdf"),
+            basePosition=self.object_initial_pos['table'][:3],
+            baseOrientation=self.object_initial_pos['table'][3:])
+        if self.chest:
+            self.chest_robot.reset()
 
-            for n in range(self.num_block):
-                block_name = self.block_keys[n]
-                self.object_bodies[block_name] = self._p.loadURDF(
-                    os.path.join(self.object_assets_path, block_name + ".urdf"),
-                    basePosition=self.object_initial_pos[block_name][:3],
-                    baseOrientation=self.object_initial_pos[block_name][3:])
+        for n in range(self.num_block):
+            block_name = self.block_keys[n]
+            self.object_bodies[block_name] = self._p.loadURDF(
+                os.path.join(self.object_assets_path, block_name + ".urdf"),
+                basePosition=self.object_initial_pos[block_name][:3],
+                baseOrientation=self.object_initial_pos[block_name][3:])
 
-                target_name = self.target_keys[n]
-                self.object_bodies[target_name] = self._p.loadURDF(
-                    os.path.join(self.object_assets_path, target_name + ".urdf"),
-                    basePosition=self.object_initial_pos[target_name][:3],
-                    baseOrientation=self.object_initial_pos[target_name][3:])
+            target_name = self.target_keys[n]
+            self.object_bodies[target_name] = self._p.loadURDF(
+                os.path.join(self.object_assets_path, target_name + ".urdf"),
+                basePosition=self.object_initial_pos[target_name][:3],
+                baseOrientation=self.object_initial_pos[target_name][3:])
 
-                if not self.visualize_target:
-                    self._set_object_pose(self.object_bodies[target_name],
-                                          [0.0, 0.0, -3.0],
-                                          self.object_initial_pos[target_name][3:])
+            if not self.visualize_target:
+                self._set_object_pose(self.object_bodies[target_name],
+                                    [0.0, 0.0, -3.0],
+                                    self.object_initial_pos[target_name][3:])
 
-            if self.grip_informed_goal:
-                self.object_bodies[self.grip_target_key] = self._p.loadURDF(
-                    os.path.join(self.object_assets_path, "target_gripper_tip.urdf"),
-                    basePosition=self.object_initial_pos[self.grip_target_key][:3],
-                    baseOrientation=self.object_initial_pos[self.grip_target_key][3:])
-                if not self.visualize_target:
-                    self._set_object_pose(self.object_bodies[self.grip_target_key],
-                                          [0.0, 0.0, -3.0],
-                                          self.object_initial_pos[self.grip_target_key][3:])
-
-        # randomize object positions
+        if self.grip_informed_goal:
+            self.object_bodies[self.grip_target_key] = self._p.loadURDF(
+                os.path.join(self.object_assets_path, "target_gripper_tip.urdf"),
+                basePosition=self.object_initial_pos[self.grip_target_key][:3],
+                baseOrientation=self.object_initial_pos[self.grip_target_key][3:])
+    
+    def randomize_object_positions(self):
         block_poses = []
         for _ in range(self.num_block):
             done = False
             while not done:
                 new_object_xy = self.np_random.uniform(self.robot.object_bound_lower[:-1],
-                                                       self.robot.object_bound_upper[:-1])
+                                                    self.robot.object_bound_upper[:-1])
                 object_not_overlap = []
                 for pos in block_poses + [self.robot.end_effector_tip_initial_position]:
                     object_not_overlap.append((np.linalg.norm(new_object_xy - pos[:-1]) > 0.06))
@@ -238,12 +232,26 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
 
         for i in range(self.num_block):
             self._set_object_pose(self.object_bodies[self.block_keys[i]],
-                                  block_poses[i],
-                                  self.object_initial_pos[self.block_keys[i]][3:])
+                                block_poses[i],
+                                self.object_initial_pos[self.block_keys[i]][3:])
+        
+        return block_poses
+            
+    def _task_reset(self, test=False):
+        self.test = test
+        if not self.objects_urdf_loaded:
+            self._load_object()
+            if not self.visualize_target:
+                self._set_object_pose(self.object_bodies[self.grip_target_key],
+                                    [0.0, 0.0, -3.0],
+                                    self.object_initial_pos[self.grip_target_key][3:])
+
+        # randomize object positions
+        block_poses = self.randomize_object_positions()
 
         if self.chest:
             self.chest_robot.robot_specific_reset()
-
+            
         # generate goals & images
         self._generate_goal(block_poses, new_target=True)
         if self.task_decomposition:
@@ -253,67 +261,87 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
 
     def _step_callback(self):
         pass
+    
+    def _calculate_all_state(self):
+            gripper_xyz, gripper_rpy, gripper_finger_closeness, gripper_vel_xyz, gripper_vel_rpy, gripper_finger_vel, joint_poses = self.robot.calc_robot_state()
+            block_xyzs = []
+            block_states = []
+            policy_block_states = []
+            achieved_goal = []
+            for n in range(self.num_block):
+                block_name = self.block_keys[n]
+                block_xyz, block_rpy = self._p.getBasePositionAndOrientation(self.object_bodies[block_name])
+                block_xyzs.append(np.array(block_xyz))
+                block_rel_xyz = gripper_xyz - np.array(block_xyz)
+                block_vel_xyz, block_vel_rpy = self._p.getBaseVelocity(self.object_bodies[block_name])
+                block_rel_vel_xyz = gripper_vel_xyz - np.array(block_vel_xyz)
+                block_rel_vel_rpy = gripper_vel_rpy - np.array(block_vel_rpy)
+                # a block state for critic network contains:
+                #   World frame position & euler orientation
+                #   Relative position (w.r.t. gripper tip)
+                #   Relative linear & euler-angular velocities (w.r.t. gripper tip)
+                block_states = block_states + [block_xyz, block_rel_xyz, block_rpy, block_rel_vel_xyz, block_rel_vel_rpy]
+                # a block state for policy network contains the relative position w.r.t. gripper tip
+                policy_block_states = policy_block_states + [block_rel_xyz]
+                # an achieved goal contains the current block positions in world frame
+                achieved_goal.append(np.array(block_xyz).copy())
 
+            state = [gripper_xyz, gripper_finger_closeness, gripper_vel_xyz, gripper_finger_vel] + block_states
+            policy_state = [gripper_xyz, gripper_finger_closeness] + policy_block_states
+
+            if self.joint_control:
+                state = [joint_poses] + state
+                policy_state = [joint_poses] + policy_state
+
+            if self.chest:
+                # door joint state represents the openness and velocity of the door
+                door_joint_pos, door_joint_vel, keypoint_state = self.chest_robot.calc_robot_state()
+                state = state + [[door_joint_pos], [door_joint_vel]] + keypoint_state
+                policy_state = policy_state + [[door_joint_pos]] + keypoint_state
+                achieved_goal.insert(0, [door_joint_pos])
+
+                # keep the door opened if the robot has somehow opened it
+                if np.abs(self.chest_door_opened_state - door_joint_pos) <= 0.01:
+                    self.chest_robot.apply_action([self.chest_door_opened_state])
+
+            if self.grip_informed_goal:
+                # gripper informed goals in addition indicates that goal states of the gripper (coordinates & finger width)
+                achieved_goal.append(gripper_xyz)
+                if self.grasping:
+                    achieved_goal.append(gripper_finger_closeness)
+
+            state = np.clip(np.concatenate(state), -5.0, 5.0)
+            policy_state = np.clip(np.concatenate(policy_state), -5.0, 5.0)
+            achieved_goal = np.concatenate(achieved_goal)
+
+            # update goals based on new block positions
+            self._generate_goal(block_poses=block_xyzs, new_target=False)
+            if self.task_decomposition:
+                self.set_sub_goal(sub_goal_ind=self.sub_goal_ind)
+
+            return state,policy_state,block_xyzs,achieved_goal
+        
+    def _image_observation_handle(self,obs_dict,block_xyzs):
+        images = []
+        state = obs_dict['observation']
+        for cam_id in self.observation_cam_id:
+            images.append(self.render(mode=self.render_mode, camera_id=cam_id))
+        obs_dict['observation'] = images[0].copy()
+        obs_dict['images'] = images
+        obs_dict.update({'state': state.copy()})
+        if self.goal_image:
+            self._generate_goal_image(block_poses=block_xyzs)
+            achieved_goal_img = self.render(mode=self.render_mode, camera_id=self.goal_cam_id)
+            obs_dict.update({
+                'achieved_goal_img': achieved_goal_img.copy(),
+                'desired_goal_img': self.desired_goal_image.copy(),
+            })
+        return obs_dict
+    
     def _get_obs(self):
         # robot state contains gripper xyz coordinates, orientation (and finger width)
-        gripper_xyz, gripper_rpy, gripper_finger_closeness, gripper_vel_xyz, gripper_vel_rpy, gripper_finger_vel, joint_poses = self.robot.calc_robot_state()
         assert self.desired_goal is not None
-
-        block_xyzs = []
-        block_states = []
-        policy_block_states = []
-        achieved_goal = []
-        for n in range(self.num_block):
-            block_name = self.block_keys[n]
-            block_xyz, block_rpy = self._p.getBasePositionAndOrientation(self.object_bodies[block_name])
-            block_xyzs.append(np.array(block_xyz))
-            block_rel_xyz = gripper_xyz - np.array(block_xyz)
-            block_vel_xyz, block_vel_rpy = self._p.getBaseVelocity(self.object_bodies[block_name])
-            block_rel_vel_xyz = gripper_vel_xyz - np.array(block_vel_xyz)
-            block_rel_vel_rpy = gripper_vel_rpy - np.array(block_vel_rpy)
-            # a block state for critic network contains:
-            #   World frame position & euler orientation
-            #   Relative position (w.r.t. gripper tip)
-            #   Relative linear & euler-angular velocities (w.r.t. gripper tip)
-            block_states = block_states + [block_xyz, block_rel_xyz, block_rpy, block_rel_vel_xyz, block_rel_vel_rpy]
-            # a block state for policy network contains the relative position w.r.t. gripper tip
-            policy_block_states = policy_block_states + [block_rel_xyz]
-            # an achieved goal contains the current block positions in world frame
-            achieved_goal.append(np.array(block_xyz).copy())
-
-        state = [gripper_xyz, gripper_finger_closeness, gripper_vel_xyz, gripper_finger_vel] + block_states
-        policy_state = [gripper_xyz, gripper_finger_closeness] + policy_block_states
-
-        if self.joint_control:
-            state = [joint_poses] + state
-            policy_state = [joint_poses] + policy_state
-
-        if self.chest:
-            # door joint state represents the openness and velocity of the door
-            door_joint_pos, door_joint_vel, keypoint_state = self.chest_robot.calc_robot_state()
-            state = state + [[door_joint_pos], [door_joint_vel]] + keypoint_state
-            policy_state = policy_state + [[door_joint_pos]] + keypoint_state
-            achieved_goal.insert(0, [door_joint_pos])
-
-            # keep the door opened if the robot has somehow opened it
-            if np.abs(self.chest_door_opened_state - door_joint_pos) <= 0.01:
-                self.chest_robot.apply_action([self.chest_door_opened_state])
-
-        if self.grip_informed_goal:
-            # gripper informed goals in addition indicates that goal states of the gripper (coordinates & finger width)
-            achieved_goal.append(gripper_xyz)
-            if self.grasping:
-                achieved_goal.append(gripper_finger_closeness)
-
-        state = np.clip(np.concatenate(state), -5.0, 5.0)
-        policy_state = np.clip(np.concatenate(policy_state), -5.0, 5.0)
-        achieved_goal = np.concatenate(achieved_goal)
-
-        # update goals based on new block positions
-        self._generate_goal(block_poses=block_xyzs, new_target=False)
-        if self.task_decomposition:
-            self.set_sub_goal(sub_goal_ind=self.sub_goal_ind)
-
+        state,policy_state,block_xyzs,achieved_goal = self._calculate_all_state()
         assert achieved_goal.shape == self.desired_goal.shape
 
         obs_dict = {'observation': state.copy(),
@@ -322,19 +350,7 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
                     'desired_goal': self.desired_goal.copy()}
 
         if self.image_observation:
-            images = []
-            for cam_id in self.observation_cam_id:
-                images.append(self.render(mode=self.render_mode, camera_id=cam_id))
-            obs_dict['observation'] = images[0].copy()
-            obs_dict['images'] = images
-            obs_dict.update({'state': state.copy()})
-            if self.goal_image:
-                self._generate_goal_image(block_poses=block_xyzs)
-                achieved_goal_img = self.render(mode=self.render_mode, camera_id=self.goal_cam_id)
-                obs_dict.update({
-                    'achieved_goal_img': achieved_goal_img.copy(),
-                    'desired_goal_img': self.desired_goal_image.copy(),
-                })
+            updated_obs_dict = self._image_observation_handle(obs_dict=obs_dict,block_xyzs=block_xyzs)
         return obs_dict
     def _compute_reward(self, achieved_goal, desired_goal):
         # this computes the extrinsic reward
