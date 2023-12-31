@@ -350,7 +350,8 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
                     'desired_goal': self.desired_goal.copy()}
 
         if self.image_observation:
-            updated_obs_dict = self._image_observation_handle(obs_dict=obs_dict,block_xyzs=block_xyzs)
+            obs_dict = self._image_observation_handle(obs_dict=obs_dict,block_xyzs=block_xyzs)
+        
         return obs_dict
     def _compute_reward(self, achieved_goal, desired_goal):
         # this computes the extrinsic reward

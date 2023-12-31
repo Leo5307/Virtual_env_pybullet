@@ -73,35 +73,29 @@ class KukaBulletMGEnv(BaseBulletMGEnv):
                                  image_observation=image_observation, goal_image=goal_image,
                                  camera_setup=camera_setup,
                                  seed=0, timestep=0.002, frame_skip=20)
-
-    def _task_reset(self, test=False):
-        if not self.objects_urdf_loaded:
-            # don't reload object urdf
-            self.objects_urdf_loaded = True
-            self.object_bodies['table'] = self._p.loadURDF(
-                os.path.join(self.object_assets_path, self.table_type + ".urdf"),
-                basePosition=self.object_initial_pos['table'][:3],
-                baseOrientation=self.object_initial_pos['table'][3:])
-            self.object_bodies['target'] = self._p.loadURDF(
-                os.path.join(self.object_assets_path, "target.urdf"),
-                basePosition=self.object_initial_pos['target'][:3],
-                baseOrientation=self.object_initial_pos['target'][3:])
-            if self.has_obj:
-                if self.table_type == 'long_table':
-                    self.object_bodies['block'] = self._p.loadURDF(
-                        os.path.join(self.object_assets_path, "cylinder_bulk.urdf"),
-                        basePosition=self.object_initial_pos['block'][:3],
-                        baseOrientation=self.object_initial_pos['block'][3:])
-                else:
-                    self.object_bodies['block'] = self._p.loadURDF(
-                        os.path.join(self.object_assets_path, "block.urdf"),
-                        basePosition=self.object_initial_pos['block'][:3],
-                        baseOrientation=self.object_initial_pos['block'][3:])
-            if not self.visualize_target:
-                self.set_object_pose(self.object_bodies['target'],
-                                     [0.0, 0.0, -3.0],
-                                     self.object_initial_pos['target'][3:])
-
+    def _load_object(self):
+        self.objects_urdf_loaded = True
+        self.object_bodies['table'] = self._p.loadURDF(
+            os.path.join(self.object_assets_path, self.table_type + ".urdf"),
+            basePosition=self.object_initial_pos['table'][:3],
+            baseOrientation=self.object_initial_pos['table'][3:])
+        self.object_bodies['target'] = self._p.loadURDF(
+            os.path.join(self.object_assets_path, "target.urdf"),
+            basePosition=self.object_initial_pos['target'][:3],
+            baseOrientation=self.object_initial_pos['target'][3:])
+        if self.has_obj:
+            if self.table_type == 'long_table':
+                self.object_bodies['block'] = self._p.loadURDF(
+                    os.path.join(self.object_assets_path, "cylinder_bulk.urdf"),
+                    basePosition=self.object_initial_pos['block'][:3],
+                    baseOrientation=self.object_initial_pos['block'][3:])
+            else:
+                self.object_bodies['block'] = self._p.loadURDF(
+                    os.path.join(self.object_assets_path, "block.urdf"),
+                    basePosition=self.object_initial_pos['block'][:3],
+                    baseOrientation=self.object_initial_pos['block'][3:])
+                
+    def _randomize_object_positions(self):
         # randomize object positions
         object_xyz_1 = None
         if self.has_obj:
@@ -115,7 +109,18 @@ class KukaBulletMGEnv(BaseBulletMGEnv):
             self.set_object_pose(self.object_bodies['block'],
                                  object_xyz_1,
                                  self.object_initial_pos['block'][3:])
+        return object_xyz_1
+    def _task_reset(self, test=False):
+        if not self.objects_urdf_loaded:
+            # don't reload object urdf
+            self._load_object()
+            if not self.visualize_target:
+                self.set_object_pose(self.object_bodies['target'],
+                                     [0.0, 0.0, -3.0],
+                                     self.object_initial_pos['target'][3:])
+    
 
+        object_xyz_1 = self._randomize_object_positions()
         # generate goals & images
         self._generate_goal(current_obj_pos=object_xyz_1)
         if self.goal_image:
@@ -191,10 +196,9 @@ class KukaBulletMGEnv(BaseBulletMGEnv):
     def _step_callback(self):
         pass
 
-    def _get_obs(self):
-        # robot state contains gripper xyz coordinates, orientation (and finger width)
+
+    def _calculate_all_state(self):
         gripper_xyz, gripper_rpy, gripper_finger_closeness, gripper_vel_xyz, gripper_vel_rpy, gripper_finger_vel, joint_poses = self.robot.calc_robot_state()
-        assert self.desired_goal is not None
         policy_state = state = gripper_xyz
         achieved_goal = gripper_xyz.copy()
         if self.has_obj:
@@ -215,24 +219,36 @@ class KukaBulletMGEnv(BaseBulletMGEnv):
         if self.joint_control:
             state = np.concatenate((joint_poses, state))
             policy_state = np.concatenate((joint_poses, policy_state))
+            
+        return state,policy_state,achieved_goal
+    
+    def _image_observation_handle(self,obs_dict):
+        images = []
+        state = obs_dict['observation']
+        for cam_id in self.observation_cam_id:
+            images.append(self.render(mode=self.render_mode, camera_id=cam_id))
+        obs_dict['observation'] = images[0].copy()
+        obs_dict['images'] = images
+        obs_dict.update({'state': state.copy()})
+        if self.goal_image:
+            achieved_goal_img = self.render(mode=self.render_mode, camera_id=self.goal_cam_id)
+            obs_dict.update({
+                'achieved_goal_img': achieved_goal_img.copy(),
+                'desired_goal_img': self.desired_goal_image.copy(),
+            })
+        return obs_dict
+    
+    def _get_obs(self):
+        # robot state contains gripper xyz coordinates, orientation (and finger width)
+        assert self.desired_goal is not None
+        state,policy_state,achieved_goal = self._calculate_all_state()
 
         obs_dict = {'observation': state.copy(),
                     'policy_state': policy_state.copy(),
                     'achieved_goal': achieved_goal.copy(),
                     'desired_goal': self.desired_goal.copy()}
         if self.image_observation:
-            images = []
-            for cam_id in self.observation_cam_id:
-                images.append(self.render(mode=self.render_mode, camera_id=cam_id))
-            obs_dict['observation'] = images[0].copy()
-            obs_dict['images'] = images
-            obs_dict.update({'state': state.copy()})
-            if self.goal_image:
-                achieved_goal_img = self.render(mode=self.render_mode, camera_id=self.goal_cam_id)
-                obs_dict.update({
-                    'achieved_goal_img': achieved_goal_img.copy(),
-                    'desired_goal_img': self.desired_goal_image.copy(),
-                })
+            obs_dict = self._image_observation_handle(obs_dict=obs_dict)
         return obs_dict
 
     def _compute_reward(self, achieved_goal, desired_goal):
