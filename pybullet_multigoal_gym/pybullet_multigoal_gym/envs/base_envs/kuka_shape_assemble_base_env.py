@@ -4,6 +4,7 @@ import quaternion as quat
 from pybullet_multigoal_gym.envs.base_envs.base_env import BaseBulletMGEnv
 from pybullet_multigoal_gym.robots.kuka import Kuka
 from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward
+from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward,Basic_compute_reward,Pick_up_reward,Reach_reward,Insert_reward
 
 
 class KukaBulletPrimitiveEnv(BaseBulletMGEnv):
@@ -203,9 +204,8 @@ class KukaBulletPrimitiveEnv(BaseBulletMGEnv):
         return obs_dict
     def _compute_reward(self, achieved_goal, desired_goal):
         # this computes the extrinsic reward
-        computer_reward = Compute_reward()
-        return computer_reward.basic_compute_reward(achieved_goal=achieved_goal,desired_goal=desired_goal,
-                                                   distance_threshold = self.distance_threshold,binary_reward = self.binary_reward)
+        computer_reward = Basic_compute_reward(distance_threshold = self.distance_threshold)
+        return computer_reward.compute_reward(achieved_goal=achieved_goal,desired_goal=desired_goal,binary_reward = self.binary_reward)
 
     # def _compute_reward(self, achieved_goal, desired_goal):
     #     assert achieved_goal.shape == desired_goal.shape

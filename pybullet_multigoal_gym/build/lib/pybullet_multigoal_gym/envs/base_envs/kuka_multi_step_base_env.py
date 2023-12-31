@@ -338,9 +338,8 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
         return obs_dict
     def _compute_reward(self, achieved_goal, desired_goal):
         # this computes the extrinsic reward
-        computer_reward = Compute_reward()
-        return computer_reward.basic_compute_reward(achieved_goal=achieved_goal,desired_goal=desired_goal,
-                                                   distance_threshold = self.distance_threshold,binary_reward = self.binary_reward)
+        computer_reward = Basic_compute_reward(distance_threshold = self.distance_threshold)
+        return computer_reward.compute_reward(achieved_goal=achieved_goal,desired_goal=desired_goal,binary_reward = self.binary_reward)
 
     # def _compute_reward(self, achieved_goal, desired_goal):
     #     assert achieved_goal.shape == desired_goal.shape

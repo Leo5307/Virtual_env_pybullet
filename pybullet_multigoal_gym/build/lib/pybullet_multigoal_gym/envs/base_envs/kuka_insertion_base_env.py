@@ -3,7 +3,7 @@ import numpy as np
 import quaternion as quat
 from pybullet_multigoal_gym.envs.base_envs.base_env import BaseBulletMGEnv
 from pybullet_multigoal_gym.robots.kuka import Kuka
-from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward
+from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward,Basic_compute_reward,Pick_up_reward,Reach_reward,Insert_reward
 
 class KukaBulletInsertionEnv(BaseBulletMGEnv):
     """
@@ -220,10 +220,13 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
         insert_target_xyz = slot_target_xyz.copy()
         insert_target_xyz[-1] += 0.03
         
-        compute_reward = Compute_reward(distance_threshold = self.distance_threshold)
-        reward_pick_up,achieved_pick_up = compute_reward.pick_up_reward(gripper_xyz,grasp_target_xyz,goal_object_xyz)
-        reward_reach,achieved_reach =  compute_reward.reach_reward(reach_target_xyz,goal_object_xyz,slot_target_euler,goal_object_euler)
-        reward_insert, achieved_insert =  compute_reward.insert_reward(insert_target_xyz,goal_object_xyz,slot_target_euler,goal_object_euler)
+        pick_up_reward_calculator = Pick_up_reward(self.distance_threshold)
+        reach_reward_calculator = Reach_reward(self.distance_threshold)
+        insert_reward_calculator = Insert_reward(self.distance_threshold)
+        
+        reward_pick_up,achieved_pick_up = pick_up_reward_calculator.compute_reward(gripper_xyz,grasp_target_xyz,goal_object_xyz)
+        reward_reach,achieved_reach =  reach_reward_calculator.compute_reward(reach_target_xyz,goal_object_xyz,slot_target_euler,goal_object_euler)
+        reward_insert, achieved_insert =  insert_reward_calculator.compute_reward(insert_target_xyz,goal_object_xyz,slot_target_euler,goal_object_euler)
         
         return {
             'pick_up': np.clip(reward_pick_up, -15.0, 0.0),
@@ -242,8 +245,8 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
 
     def _compute_reward(self, achieved_goal, desired_goal):
         # this computes the extrinsic reward
-        computer_reward = Compute_reward(distance_threshold = self.distance_threshold)
-        return computer_reward.basic_compute_reward(achieved_goal=achieved_goal,desired_goal=desired_goal,binary_reward = self.binary_reward)
+        computer_reward = Basic_compute_reward(distance_threshold = self.distance_threshold)
+        return computer_reward.compute_reward(achieved_goal=achieved_goal,desired_goal=desired_goal,binary_reward = self.binary_reward)
 
     def set_object_pose(self, body_id, position, orientation=None):
         if orientation is None:
