@@ -3,7 +3,6 @@ import numpy as np
 import quaternion as quat
 from pybullet_multigoal_gym.envs.base_envs.base_env import BaseBulletMGEnv
 from pybullet_multigoal_gym.robots.kuka import Kuka
-from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward
 from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward,Basic_compute_reward,Pick_up_reward,Reach_reward,Insert_reward
 
 
