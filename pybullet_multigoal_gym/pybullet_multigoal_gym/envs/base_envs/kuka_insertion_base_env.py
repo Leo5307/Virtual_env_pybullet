@@ -92,12 +92,6 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
                     basePosition=self.object_initial_pos['target'][:3],
                     baseOrientation=self.object_initial_pos['target'][3:])
             
-    # def _set_object_pose(self):
-    #     # if not self.visualize_target:
-    #         self.set_object_pose(self.object_bodies[self.goal_object_key+'_target'],
-    #                             [0.0, 0.0, -3.0],
-    #                             self.object_initial_pos['target'][3:])
-            
     def randomize_object_positions(self):
 
         # randomize object positions
@@ -134,57 +128,6 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
                                     [0.0, 0.0, -3.0],
                                     self.object_initial_pos['target'][3:])
         self.randomize_object_positions()
-
-    # def _task_reset(self, test=False):
-    #     if not self.objects_urdf_loaded:
-    #         # don't reload object urdf
-    #         self.objects_urdf_loaded = True
-    #         self.object_bodies['workspace'] = self._p.loadURDF(
-    #             os.path.join(self.object_assets_path, "workspace.urdf"),
-    #             basePosition=self.object_initial_pos['workspace'][:3],
-    #             baseOrientation=self.object_initial_pos['workspace'][3:])
-
-    #         for object_key in self.manipulated_object_keys:
-    #             self.object_bodies[object_key] = self._p.loadURDF(
-    #                 os.path.join(self.object_assets_path, object_key+".urdf"),
-    #                 basePosition=self.object_initial_pos[object_key][:3],
-    #                 baseOrientation=self.object_initial_pos[object_key][3:])
-
-    #         self.object_bodies[self.goal_object_key+'_target'] = self._p.loadURDF(
-    #             os.path.join(self.object_assets_path, self.goal_object_key+"_target.urdf"),
-    #             basePosition=self.object_initial_pos['target'][:3],
-    #             baseOrientation=self.object_initial_pos['target'][3:])
-
-    #         if not self.visualize_target:
-    #             self.set_object_pose(self.object_bodies[self.goal_object_key+'_target'],
-    #                                  [0.0, 0.0, -3.0],
-    #                                  self.object_initial_pos['target'][3:])
-
-    #     # randomize object positions
-    #     object_poses = []
-    #     object_quats = []
-    #     for object_key in self.manipulated_object_keys:
-    #         done = False
-    #         while not done:
-    #             new_object_xy = self.np_random.uniform(self.robot.object_bound_lower[:-1],
-    #                                                    self.robot.object_bound_upper[:-1])
-    #             object_not_overlap = []
-    #             for pos in object_poses + [self.robot.end_effector_tip_initial_position]:
-    #                 object_not_overlap.append((np.linalg.norm(new_object_xy - pos[:-1]) > 0.06))
-    #             if all(object_not_overlap):
-    #                 object_poses.append(np.concatenate((new_object_xy.copy(), [self.object_initial_pos[object_key][2]])))
-    #                 done = True
-
-    #         orientation_euler = quat.as_euler_angles(quat.as_quat_array([1., 0., 0., 0.]))
-    #         orientation_euler[-1] = self.np_random.uniform(-1.0, 1.0) * np.pi
-    #         orientation_quat_new = quat.as_float_array(quat.from_euler_angles(orientation_euler))
-    #         orientation_quat_new = np.concatenate([orientation_quat_new[1:], [orientation_quat_new[0]]], axis=-1)
-    #         object_quats.append(orientation_quat_new.copy())
-
-    #         self.set_object_pose(self.object_bodies[object_key],
-    #                              object_poses[-1],
-    #                              orientation_quat_new)
-
         # generate goals & images
         self._generate_goal()
         if self.goal_image:
