@@ -6,8 +6,10 @@ from pybullet_multigoal_gym.envs.base_envs.base_env import BaseBulletMGEnv
 from pybullet_multigoal_gym.robots.kuka import Kuka
 from pybullet_multigoal_gym.robots.chest import Chest
 from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward,Basic_compute_reward,Pick_up_reward,Reach_reward,Insert_reward
-
-
+RANGE_TOLERANCE = 0.15
+DISTANCE_THRESHOLD = 0.05
+LOWER_BOUND = -5
+UPPER_BOUND = 5
 
 class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
     """
@@ -19,7 +21,7 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
                  camera_setup=None, observation_cam_id=None, goal_cam_id=0,
                  gripper_type='parallel_jaw', end_effector_start_on_table=False,
                  num_block=3, joint_control=False, grasping=False, chest=False, chest_door='front_sliding',
-                 obj_range=0.15, target_range=0.15, distance_threshold=0.05,
+                 obj_range=RANGE_TOLERANCE, target_range=RANGE_TOLERANCE, distance_threshold=DISTANCE_THRESHOLD,
                  use_curriculum=False, task_decomposition=False,
                  num_curriculum=5, base_curriculum_episode_steps=50, num_goals_to_generate=1e5):
         if observation_cam_id is None:
@@ -310,8 +312,8 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
                 if self.grasping:
                     achieved_goal.append(gripper_finger_closeness)
 
-            state = np.clip(np.concatenate(state), -5.0, 5.0)
-            policy_state = np.clip(np.concatenate(policy_state), -5.0, 5.0)
+            state = np.clip(np.concatenate(state), LOWER_BOUND, UPPER_BOUND)
+            policy_state = np.clip(np.concatenate(policy_state), LOWER_BOUND, UPPER_BOUND)
             achieved_goal = np.concatenate(achieved_goal)
 
             # update goals based on new block positions
@@ -357,15 +359,6 @@ class KukaBulletMultiBlockEnv(BaseBulletMGEnv):
         # this computes the extrinsic reward
         computer_reward = Basic_compute_reward(distance_threshold = self.distance_threshold)
         return computer_reward.compute_reward(achieved_goal=achieved_goal,desired_goal=desired_goal,binary_reward = self.binary_reward)
-
-    # def _compute_reward(self, achieved_goal, desired_goal):
-    #     assert achieved_goal.shape == desired_goal.shape
-    #     d = np.linalg.norm(achieved_goal - desired_goal, axis=-1)
-    #     not_achieved = (d > self.distance_threshold)
-    #     if self.binary_reward:
-    #         return -not_achieved.astype(np.float32), ~not_achieved
-    #     else:
-    #         return -d, ~not_achieved
 
     def _generate_goal(self, block_poses, new_target=True):
         raise NotImplementedError

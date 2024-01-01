@@ -4,6 +4,10 @@ import quaternion as quat
 from pybullet_multigoal_gym.envs.base_envs.base_env import BaseBulletMGEnv
 from pybullet_multigoal_gym.robots.kuka import Kuka
 from pybullet_multigoal_gym.envs.base_envs.compute_reward import Compute_reward,Basic_compute_reward,Pick_up_reward,Reach_reward,Insert_reward
+RANGE_TOLERANCE = 0.15
+DISTANCE_THRESHOLD = 0.05
+LOWER_BOUND = -15
+UPPER_BOUND = 0.0
 
 class KukaBulletInsertionEnv(BaseBulletMGEnv):
     """
@@ -15,9 +19,9 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
                  visualize_target=True, regenerate_goal_when_step=False,
                  manipulated_object_keys=None, goal_object_key='rectangle', orientation_informed_goal=False,
                  camera_setup=None, observation_cam_id=None, goal_cam_id=0, pcd_cam_id=0,
-                 gripper_type='parallel_jaw', obj_range=0.15, target_range=0.15,
+                 gripper_type='parallel_jaw', obj_range=RANGE_TOLERANCE, target_range=RANGE_TOLERANCE,
                  end_effector_start_on_table=False,
-                 distance_threshold=0.05, grasping=False):
+                 distance_threshold=DISTANCE_THRESHOLD, grasping=False):
         if observation_cam_id is None:
             observation_cam_id = [0]
         if manipulated_object_keys is None:
@@ -227,9 +231,9 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
         slot_target_euler = quat.as_euler_angles(quat.as_quat_array([w, a, b, c]))
         slot_target_xyz = np.array(slot_target_xyz)
         reach_target_xyz = slot_target_xyz.copy()
-        reach_target_xyz[-1] += 0.06
+        reach_target_xyz[-1] += 2*RANGE_TOLERANCE
         insert_target_xyz = slot_target_xyz.copy()
-        insert_target_xyz[-1] += 0.03
+        insert_target_xyz[-1] += RANGE_TOLERANCE
         
         pick_up_reward_calculator = Pick_up_reward(self.distance_threshold)
         reach_reward_calculator = Reach_reward(self.distance_threshold)
@@ -240,15 +244,15 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
         reward_insert, achieved_insert =  insert_reward_calculator.compute_reward(insert_target_xyz,goal_object_xyz,slot_target_euler,goal_object_euler)
         
         return {
-            'pick_up': np.clip(reward_pick_up, -15.0, 0.0),
+            'pick_up': np.clip(reward_pick_up, LOWER_BOUND, UPPER_BOUND),
             'pick_up_done': achieved_pick_up,
-            'pick_up_desired_goal': np.concatenate([grasp_target_xyz, [0.15]]),
+            'pick_up_desired_goal': np.concatenate([grasp_target_xyz, [RANGE_TOLERANCE]]),
             'pick_up_achieved_goal': np.concatenate([gripper_xyz, [goal_object_xyz[-1]]]),
-            'reach': np.clip(reward_reach, -15.0, 0.0),
+            'reach': np.clip(reward_reach, LOWER_BOUND, UPPER_BOUND),
             'reach_done': achieved_reach,
             'reach_desired_goal': np.concatenate([reach_target_xyz, slot_target_euler]),
             'reach_achieved_goal': np.concatenate([goal_object_xyz, goal_object_euler]),
-            'insert': np.clip(reward_insert, -15.0, 0.0),
+            'insert': np.clip(reward_insert, LOWER_BOUND, UPPER_BOUND),
             'insert_done': achieved_insert,
             'insert_desired_goal': np.concatenate([insert_target_xyz, slot_target_euler]),
             'insert_achieved_goal': np.concatenate([goal_object_xyz, goal_object_euler])
