@@ -96,7 +96,7 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
                     basePosition=self.object_initial_pos['target'][:3],
                     baseOrientation=self.object_initial_pos['target'][3:])
             
-    def randomize_object_positions(self):
+    def _randomize_object_positions(self):
 
         # randomize object positions
         object_poses = []
@@ -131,7 +131,7 @@ class KukaBulletInsertionEnv(BaseBulletMGEnv):
                 self.set_object_pose(self.object_bodies[self.goal_object_key+'_target'],
                                     [0.0, 0.0, -3.0],
                                     self.object_initial_pos['target'][3:])
-        self.randomize_object_positions()
+        self._randomize_object_positions()
         # generate goals & images
         self._generate_goal()
         if self.goal_image:

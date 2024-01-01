@@ -3,7 +3,8 @@ import quaternion as quat
 
 class Compute_reward:
     def __init__(self,distance_threshold):
-        self.distance_threshold = distance_threshold
+        pass
+        # self.distance_threshold = distance_threshold
         
     def compute_reward(self):
         raise NotImplementedError
